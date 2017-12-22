@@ -84,6 +84,8 @@ function gameEngine(vue, vueData) {
       game.load.image("musicBtn", rootUrl + "btn_audio.png");
       game.load.image("ruleBox", rootUrl + "ruleLayer.png");
       game.load.image("close_2", rootUrl + "close_3.png");
+      game.load.image("outBox", rootUrl + "outBox.png");
+      
       game.load.spritesheet("snowflakes", rootUrl + "snowflakes.png", 17, 17);
       game.load.spritesheet("snowflakes_large",rootUrl + "snowflakes_large.png",64,64);
 
@@ -102,22 +104,17 @@ function gameEngine(vue, vueData) {
       game.load.image("headmask", rootUrl + "headMask.png");
       game.load.image("nextBtn", rootUrl + "btn_7.png")
       //请求头像
-      if (_vue.$common.common.$_GET("sess_token").length > 10) {
-        _vue.$http
-          .jsonp(
-            _vue.$common.common._ACTHOST + "/eliminateMusic/Mod/getUserHeadImg",
-            { params: _vue.json }
-          )
-          .then(function(data) {
-            if (data.data.code == 200) {
-              game.load.image("head", data.data.data.head_img);
-            } else {
-              game.load.image("head", rootUrl + "head.png");
-            }
-          });
-      } else {
-        game.load.image("head", rootUrl + "head.png");
-      }
+      _vue.$http.jsonp(
+        _vue.$common.common._ACTHOST + "/eliminateMusic/Mod/getUserHeadImg",
+        { params: _vue.json }
+      )
+      .then(function(data) {
+        if (data.data.code == 200) {
+          game.load.image("head", data.data.data.head_img);
+        } else {
+          game.load.image("head", rootUrl + "head.png");
+        }
+      });
 
       // 奖品
       var giftRan = Math.floor(Math.random() * 4)
@@ -182,11 +179,13 @@ function gameEngine(vue, vueData) {
 
   game.States.startup = function(game) {
     var ruleGroup;
+    var outGroup;
     var front_emitter,mid_emitter,back_emitter;
     var update_interval = 6 * 60;
     var snowMax = 0;
     var timecount = 0;
-
+    var toasted = false;
+    var ruleed = false;
     var _this = this;
     this.init = function() {};
 
@@ -216,11 +215,11 @@ function gameEngine(vue, vueData) {
 
       //开始游戏
       var startBtn;
-      startBtn = game.add.button(241,1023,"startBtn",function() {
-          goMain();
-        },game,0,0,3,0
-      );
-      
+      startBtn = game.add.button(game.world.centerX,1070,"startBtn",function() {
+        goMain();
+      },game,0,0,3,0);
+      startBtn.anchor.setTo(0.5);
+
       var gorankStyle = {
         font:'24px pingfangSC',
         fill:'#4c4e52',
@@ -229,6 +228,29 @@ function gameEngine(vue, vueData) {
       var gorank = game.add.button(game.world.centerX,1125,'gorankText',gorankClick,this,null,null,null,null);
       gorank.anchor.setTo(0.5);
       function gorankClick() {
+        if (process.env.NODE_ENV != "production") {
+          _this.nuclear()
+          _vue.$router.push({
+            name: "linkupRank",
+            params: {
+              data: _vuedata,
+              // gameData: sendData,
+              from: 'home',
+              type: 'rank'
+            },
+          });
+        }
+
+        if (com.checklogin(_vue.href) == false) {
+          return false;
+        }
+
+        if (!com.$_GET('sess_token') || com.$_GET('sess_token').length < 10){
+          com.toastTip('登陆才能游玩哦',1500)
+          return false;
+        }
+
+        _this.nuclear()
         _vue.$router.push({
           name: "linkupRank",
           params: {
@@ -239,13 +261,13 @@ function gameEngine(vue, vueData) {
           },
         });
       }
-      bgMusic = game.add.audio("bgSound");
-      bgMusic.loop = true;
-      // bgMusic.autoplay = true;
-      // bgMusic.play();
-      game.sound.setDecodedCallback(bgMusic, function(){
-        // bgMusic.play();
-      }, this);
+
+      if(!bgMusic){
+        bgMusic = game.add.audio("bgSound",'1',0.5);
+        bgMusic.loop = true
+        bgMusic.autoplay = true 
+        bgMusic.play();
+      }
 
       snowing()
       function snowing() {
@@ -299,7 +321,6 @@ function gameEngine(vue, vueData) {
         //游戏状态监测
         var token = com.$_GET("sess_token");
         var locationType = window.location.search.indexOf("sess_token");
-
         if (process.env.NODE_ENV != "production") {
           $(".noticeWarp,.pv").hide();
           game.state.start("main");
@@ -317,6 +338,10 @@ function gameEngine(vue, vueData) {
             if (data.data.code == 200) {
               $(".noticeWarp,.pv").hide();
               game.state.start("main");
+            } else if(data.data.code == 614){
+              _this.showOut()
+            } else if(data.data.code == 401){
+              window.location.href = 'https://hxsapp_showloginpage';
             } else {
               com.toastTip(data.data.msg, 1500);
             }
@@ -340,9 +365,16 @@ function gameEngine(vue, vueData) {
       musicBtnTween.to({ angle: 360 },2000, Phaser.Easing.Linear.None, true).loop()
 
       function musicClick(){
-        bgMusic.paused = !bgMusic.paused
-        musicBtnTween.isPaused = bgMusic.paused
-        bgMusicStop = !bgMusicStop
+        if(bgMusic.isPlaying){
+          bgMusic.pause()
+          // bgMusicPausedPosition = bgMusic.pausedPosition
+          musicBtnTween.isPaused = true
+          bgMusicStop = true
+        }else{
+          bgMusic.resume()
+          musicBtnTween.isPaused = false
+          bgMusicStop = false
+        }
       }
     };
 
@@ -356,6 +388,10 @@ function gameEngine(vue, vueData) {
     };
 
     this.showRule = function() {
+      if(ruleed){
+        return
+      }
+      ruleed = true
       this.ruleGroup = game.add.group();
       var ruleBox = this.ruleGroup.create(game.world.centerX, 550, "ruleBox");
       ruleBox.anchor.set(0.5);
@@ -378,10 +414,43 @@ function gameEngine(vue, vueData) {
         leftAni_2.to({ width:0,height:0,angle: 360 },200,Phaser.Easing.Linear.None,true)
 
         setTimeout(() => {
+          ruleed = false
           this.ruleGroup.destroy();
         },500)
       }
     };
+
+    this.showOut = function() {
+      if(toasted){
+        return
+      }
+      toasted = true
+      this.outGroup = game.add.group();
+      var outBox = this.outGroup.create(game.world.centerX, 550, "outBox");
+      outBox.anchor.set(0.5);
+      this.outGroup.addChild(outBox);
+
+      var outAni = game.add.tween(outBox);
+      outAni.from({ y: game.world.centerY - 800, },800,Phaser.Easing.Bounce.Out,true);
+
+      var closeBtn = game.add.button(game.world.centerX - 59/2,850,"close",closeLayer,this,null,null,null,null,
+        this.ruleGroup
+      );
+      var closeBtnAni = game.add.tween(closeBtn);
+      closeBtnAni.from({ alpha: 0, },800,Phaser.Easing.Linear.None,true);
+
+      function closeLayer() {
+        var leftAni = game.add.tween(outBox);
+        leftAni.to({ y: game.world.centerY + 800, },500,Phaser.Easing.Linear.None,true);
+        var leftAni_2 = game.add.tween(closeBtn);
+        leftAni_2.to({ width:0,height:0,angle: 360 },200,Phaser.Easing.Linear.None,true)
+
+        setTimeout(() => {
+          toasted = false
+          this.outGroup.destroy();
+        },500)
+      }
+    }
 
     this.changeWindDirection = function(){
       //随机速度
@@ -404,6 +473,10 @@ function gameEngine(vue, vueData) {
     this.setParticleXSpeed = function(particle, max){
       particle.body.velocity.x = max - Math.floor(Math.random() * 30);
     }
+
+    this.nuclear = function () {
+      game.destroy();
+    } 
   };
 
   game.States.main = function(game) {
@@ -417,7 +490,7 @@ function gameEngine(vue, vueData) {
       newIconArrTop = [];
     //补间动画
     var lockTween, boomTween;
-    var bgMusic;
+    // var bgMusic;
     //弹窗
     var loseLayer;
     //游戏地图
@@ -466,13 +539,13 @@ function gameEngine(vue, vueData) {
       game.physics.startSystem(Phaser.Physics.ARCADE);
 
       //装载背景音乐
-      if (!bgMusicStop && stage == 1) {
-        bgMusic = game.add.sound("bgSound");
-        bgMusic.autoplay = true;
-        bgMusic.loop = true;
-        bgMusic.play();
-      }
-
+      // if (!bgMusicStop && stage == 1) {
+      //   bgMusic = game.add.sound("bgSound");
+      //   bgMusic.autoplay = true;
+      //   bgMusic.loop = true;
+      //   bgMusic.play();
+      // }
+      console.log(!bgMusic)
       //渲染
       this.createBg();
       this.createTitle();
@@ -752,12 +825,8 @@ function gameEngine(vue, vueData) {
       if (point >= winPoint) {
         if (stage == 1) {
           stage++;
-
           this.imgFade()
           this.createGiftBg(1)
-          // setTimeout(() => {
-          //   this.loseToast(0);
-          // },3000)
         } else {
           this.imgFade()
           this.createGiftBg(2)
@@ -782,12 +851,10 @@ function gameEngine(vue, vueData) {
 
     this.endGame = function(sendData) {
       // 移除定时器，干掉引擎
-      // game.time.removeAll(mianTimer);
-      // 既然都干掉引擎了还管定时器干嘛
       this.gameEnd = true;
-      // game.destroy(true);
       bgMusic.stop();
-
+      _this.nuclear()
+      // debugger
       // _vue.$parent.$data.json.gamePoint = sendData.point;
       // _vue.$parent.$data.json.shareType = false;
 
@@ -798,14 +865,12 @@ function gameEngine(vue, vueData) {
           gameData: sendData,
           from: 'end',
           type:'check'
-        },
-        // query: {
-        //   sess_token: _vuedata.sess_token,
-        //   id: _vuedata.act_id
-        // }
+        }
       });
     };
-
+    this.nuclear = function () {
+      game.destroy();
+    } 
     // 补间动画
     // 消除头像
     this.killing = function(obj, parent, index) {
@@ -989,17 +1054,27 @@ export default {
       onload: false,
     };
   },
+  created() {
+    // linkme
+    var __url = 'https://app.hxsapp.com/actweb/linkup/linkup?id=' + this.json.act_id;
+
+    this.linkedMe = {
+      params: {
+        // key 是写死的   value是协议，具体见这里－http://wiki.sys.hxsapp.net/pages/viewpage.action?pageId=1998876
+        "key": "hxsapp://web?url=" + __url
+      }
+    }
+  },
   mounted() {
     var _this = this;
 
+    // 注入全局数据
+    if (_this.$route.params.backTo) {
+      _this.json = _this.$route.params.data
+    }
+
     this.$nextTick(function() {
       // 挂载引擎
-
-      // 注入全局数据
-      if (_this.$route.params.backTo) {
-        _this.json = _this.$route.params.data
-      }
-
       this.actData = this.json;
       this.pvData = this.json;
       this.onload = true;
@@ -1028,7 +1103,17 @@ export default {
   color: #000;
 }
 .pv{
-  top: 3rem !important
+  top: 4rem !important;
+  left: 0 !important;
+  right: auto !important;
+  border-top: 2px solid #254e8c !important;
+  border-bottom: 2px solid #254e8c !important;
+  border-left: none !important;
+  border-right: 2px solid #254e8c !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important; 
+  border-top-right-radius: 5px !important;
+  border-bottom-right-radius: 5px !important; 
 }
 </style>
 <style>

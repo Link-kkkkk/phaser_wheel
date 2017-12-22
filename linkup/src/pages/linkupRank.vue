@@ -3,8 +3,8 @@
     <transition name='switch'>
       <div class="infoPage" v-show='infoPage'>
         <div class="headBg"></div>
-        <div class="textboxBg_1"></div>
-        <div class="textboxBg_2"></div>
+        <!-- <div class="textboxBg_1"></div>
+        <div class="textboxBg_2"></div> -->
         <div class="head" v-show='!userIn'></div>
         <div class="inHead" v-show='userIn'>
           <img :src='userHeadImg'>
@@ -14,12 +14,12 @@
         </div> -->
         <div class="textBox_2">
           <p>您的成绩:{{grade}}</p>
-          <p>击败全国{{percent}}的用户</p>
+          <!-- <p>击败全国{{percent}}的用户</p> -->
         </div>
-        <div class="textBox_3">
+        <!-- <div class="textBox_3">
           <p>最佳成绩为:{{bestGrade}}</p>
           <p>最佳排名为:{{bestRank}}</p>
-        </div>
+        </div> -->
         <div class="playBtn" @click='backGame'></div>
         <div class="rankBtn" @click='switchPage(1)'></div>
         <!-- <div :class="drawBtn" @click='goDraw'></div> -->
@@ -32,7 +32,7 @@
         <div class="titleBtn"></div>
         <div v-show="!ruleshow">
           <div class="srankBoxTit">
-            <p class="userRank">您的当前排名:{{bestRank}}</p>
+            <p class="userRank">您的当前排名:<span class="rankColor">{{bestRank}}</span> (分数：{{bestGrade}})</p>
             <div class="srankTit"></div>
           </div>
           <div class="srankBox">
@@ -98,11 +98,11 @@ export default {
       grade: 0,
       percent: "50%",
       bestGrade: 0,
-      bestRank: "NO.521",
+      bestRank: "0",
       use: "",
-      userIn: false,
+      userIn: true,
       infoPage: true,
-      mode:'check',
+      mode:'rank',
 
       canGoDraw: true,
       ruleshow: false,
@@ -114,6 +114,8 @@ export default {
   },
   mounted() {
     var _this = this;
+
+    _this.json = _this.$route.params.data
 
     this.$nextTick(function() {
       var clientH = document.documentElement.clientHeight;
@@ -128,21 +130,24 @@ export default {
 
       if (_this.$route.params.data) {
         _this.getParams();
+      }else{
+        _this.userIn = false;
+        _this.mode = 'test'
       }
 
       this.actData = this.json;
       this.pvData = this.json;
       this.onload = true;
       
-      if (_this.$common.common.$_GET("sess_token").length > 10) {
-        _this.userIn = true;
-      }
+      // if (com.$_GET("sess_token").length < 10) {
+      //   _this.userIn = false;
+      // }
 
       _this.share();
-      _this.savePoint();
-      setTimeout(function() {
-        _this.getWinnerList();
-      }, 200);
+      _this.getHead();
+      _this.getWinnerList();
+
+      console.log(this.$route.params)
     });
   },
   methods: {
@@ -151,15 +156,27 @@ export default {
       var point = 0
       if(_this.$route.params.type == 'check'){
         _this.infoPage = true
-        var point = _this.$route.params.gameData.point;
+        _this.grade = _this.$route.params.gameData.point + '分';
         _this.mode = 'check'
+
+        _this.savePoint();
       }else{
         _this.infoPage = false
         _this.mode = 'rank'
       }
-      
-      this.json = _this.$route.params.data
-      _this.grade = point + "分";
+    },
+    getHead () {
+      var _this = this;
+      var point = 0
+      this.$http.jsonp(
+        "https://act.hxsapp.com/game/ChristmasEliminate/getUserHeadImg",
+        { params: _this.json }
+      )
+      .then(function(data) {
+        if (data.data.code == 200) {
+          _this.userHeadImg = data.data.data.head_img;
+        }
+      });
     },
     share() {
       var _this = this;
@@ -214,49 +231,38 @@ export default {
       var saveData = {
         sess_token: _this.json.sess_token,
         act_id: _this.json.act_id,
-        score: _this.grade
+        score: _this.$route.params.gameData.point
       };
-      if (_this.$common.common.$_GET("sess_token").length > 10) {
-        this.$http.jsonp(
-            "https://act.hxsapp.com/game/ChristmasEliminate/saveUserScore",
-            { params: saveData }
-          )
-          .then(function(data) {
-            if (data.data.code == 200) {
-              _this.percent = data.data.data.range;
-              _this.bestGrade = data.data.data.optimum_score;
-              _this.bestRank = "NO." + data.data.data.optimum_ranking;
-            }
-          });
 
-        this.$http.jsonp(
-            "https://act.hxsapp.com/game/ChristmasEliminate/getUserHeadImg",
-            { params: _this.json }
-          )
-          .then(function(data) {
-            if (data.data.code == 200) {
-              _this.userHeadImg = data.data.data.head_img;
-            }
-          });
-      } else {
-        _this.percent = "52%";
-        _this.bestGrade = _this.grade;
-        _this.bestRank = "NO.521";
-      }
+      this.$http.jsonp(
+        "https://act.hxsapp.com/game/ChristmasEliminate/saveUserScore",
+        { params: saveData }
+      )
+      .then(function(data) {
+        if (data.data.code == 200) {
+          // _this.percent = data.data.data.range;
+          // _this.bestGrade = data.data.data.optimum_score;
+          // _this.bestRank = "NO." + data.data.data.optimum_ranking;
+        }
+      });
     },
     getWinnerList() {
       var _this = this;
-      this.$http.jsonp(_this.$common.common._ACTHOST + "/eliminateMusic/Mod/rankings", {
+      this.$http.jsonp("https://act.hxsapp.com/game/ChristmasEliminate/rankings", {
           params: _this.json
         })
         .then(function(data) {
           if (data.data.code == 200) {
-            for (var i = 0; i < data.data.data.length; i++) {
+            // _this.percent = data.data.data.range;
+            _this.bestGrade = data.data.data.personal_info.score;
+            _this.bestRank = "NO." + data.data.data.personal_info.ranking;
+
+            for (var i = 0; i < data.data.data.ranking_info.length; i++) {
               _this.rankNameArr.push(
-                _this.subStlength(data.data.data[i].nickname, 4, 4)
+                _this.subStlength(data.data.data.ranking_info[i].nickname, 4, 4)
               );
-              _this.rankGradeArr.push(data.data.data[i].score);
-              _this.rankImgArr.push(data.data.data[i].head_img);
+              _this.rankGradeArr.push(data.data.data.ranking_info[i].score);
+              _this.rankImgArr.push(data.data.data.ranking_info[i].head_img);
             }
           }
         });
@@ -304,6 +310,9 @@ export default {
   top: 1.166667rem;
   right: 1.16666rem;
   cursor: pointer;
+}
+.rankColor{
+  color: #ffdf41
 }
 .head {
   .back(6.4rem, 6.4rem, "../img/head.png");
@@ -381,14 +390,14 @@ export default {
 .playBtn {
   .back(12.43rem, 3.53rem,"../img/btn_1.png");
   position: absolute;
-  top: 25.87rem;
+  top: 22.87rem;
   .center(12.43rem);
   cursor: pointer;
 }
 .rankBtn {
   .back(12.43rem, 3.53rem,"../img/btn_2.png");
   position: absolute;
-  top: 30.17rem;
+  top: 27.17rem;
   .center(12.43rem);
   cursor: pointer;
 }
