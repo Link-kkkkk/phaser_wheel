@@ -13,12 +13,12 @@ Vue.use(Router)
 
 export default new Router({
   mode: 'history',
-  base: '/actweb/linkup/',
-  // base: '/',
+  // base: '/actweb/linkup/',
+  base: '/',
   routes: [
     {
-      path: '/index',
-      component: index
+      path: '/',
+      component: linkupGame,
     },
     {
       path: '/linkup',

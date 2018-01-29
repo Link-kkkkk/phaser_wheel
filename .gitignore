@@ -1,0 +1,18 @@
+yarn-debug.log*
+yarn-error.log*
+sftp-config.json
+.idea/
+.tags
+.tags_sorted_by_file
+.DS_Store
+node_modules/
+npm-debug.log*
+.sass-cache/
+.vscode/ 
+
+# Editor directories and files
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
