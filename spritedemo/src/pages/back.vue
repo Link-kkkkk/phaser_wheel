@@ -55,6 +55,7 @@ function gameEngine(vue, vueData) {
 
     this.preload = function() {
       game.load.spritesheet("ground", rootUrl + "ground_1x1.png", 32, 32, 25);
+      game.load.spritesheet('tank', rootUrl + 'tank.png', 48, 41, 4)
     };
 
     this.create = function() {
@@ -64,43 +65,115 @@ function gameEngine(vue, vueData) {
 
   game.States.main = function(game) {
     var _this = this
+    let stage = 1
+    let showPoint = 10
+    let btn
+    let cursors
+    let addOnce = true
     this.init = function() {};
 
     this.preload = function() {};
 
     this.create = function() {
-      var ground = game.add.group();
-      initGround(3)
-      function initGround(stage){
-        var size = (5 - stage) * 32
-        function makeGround(index=0) {
-          var rand = Math.round(Math.random() * 25);
+      cursors = game.input.keyboard.createCursorKeys();
 
-          var x = index * size
-          var y = 0
-          
-          if(x > 900){
-            y = Math.floor(x/900) * size
-            x -= Math.floor(x/900) * 900
-            if(x%size != 0){
+      this.createGround(stage)
+      // setInterval( () => {
+      //   index++
+      //   this.createGround(index)
+      // },2000)
+    };
+
+    this.createGround = function(stage) {
+      var ground = game.add.group();
+
+      initGround(stage)
+
+      function initGround(stage,x,y){
+        var size = 4 * 32 * Math.pow(0.98,stage)
+        var time = Math.ceil(750/size) * Math.ceil(1200/size)
+
+        makeGround(time)
+
+        function makeGround(makeTime=0) {        
+          for(var i = 0; i < makeTime; i++){
+            var rand = Math.round(Math.random() * 25);
+            var x = i * size
+            var y = 0
+
+            if(x > 780){
+              y = Math.floor(x/780) * size
+              x -= Math.floor(x/780) * 780
               x -= x%size
             }
-            if((x/size) != 0){
-              x -= size
+            // x += rand
+            // y += rand
+            var sprite = ground.create(x,y,"ground",rand);
+            sprite.scale.setTo(size/32)
+
+            if(i == showPoint){
+              btn = game.add.button(x, y, 'tank', tap ,this, 0, 0, 0);
+              btn.animations.add('walk')
+              btn.animations.play('walk', 30, true)
+              btn.width = sprite.width
+              btn.height = sprite.height
+              sprite.kill()
             }
           }
 
-          var sprite = ground.create(x,y,"ground",rand);
-          sprite.scale.setTo(size/32)
-        }
-
-        var time = Math.ceil(900/size) * Math.ceil(1200/size)
-        console.log(time)
-        for (var i = 0; i < time; i++) {
-          makeGround(i)
+          function tap() {
+            stage++
+            btn.destroy()
+            ground.destroy()
+            _this.createGround(stage)
+            showPoint = Math.round(Math.random() * time);
+          }
         }
       }
-    };
+    }
+    this.update = function(){
+      if (cursors.left.isDown)
+      {
+          if(addOnce){
+            var addSprite = game.add.image(btn.x,btn.y,"ground",5)
+            addSprite.width = btn.width
+            addSprite.height = btn.height
+            addOnce = false
+          }
+          btn.x += -20;
+      }
+      else if (cursors.right.isDown)
+      {
+        if(addOnce){
+            var addSprite = game.add.image(btn.x,btn.y,"ground",5)
+            addSprite.width = btn.width
+            addSprite.height = btn.height
+            addOnce = false
+          }
+          btn.x += 20;
+      }
+
+      if (cursors.up.isDown)
+      {
+        if(addOnce){
+            var addSprite = game.add.image(btn.x,btn.y,"ground",5)
+            addSprite.width = btn.width
+            addSprite.height = btn.height
+            addOnce = false
+          }
+          btn.y += -20;
+      }
+      else if (cursors.down.isDown)
+      {
+        if(addOnce){
+            var addSprite = game.add.image(btn.x,btn.y,"ground",5)
+            addSprite.width = btn.width
+            addSprite.height = btn.height
+            addOnce = false
+          }
+          btn.y += 20;
+      }
+    }
   };
 
   //舞台配置
